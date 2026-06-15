@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Assinar Documento</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+</head>
+<body>
+
+  <div id="state-loading" class="state-container show">
+    <div class="spinner"></div>
+    <div class="state-label">Carregando documento…</div>
+  </div>
+
+  <div id="state-error" class="state-container">
+    <div class="state-icon icon-error">✕</div>
+    <div class="state-title">Documento não encontrado</div>
+    <div class="state-sub" id="error-msg">Não foi possível carregar o documento. Verifique o link e tente novamente.</div>
+  </div>
+
+  <div id="state-done" class="state-container">
+    <div class="state-icon icon-done">✓</div>
+    <div class="state-title">Assinatura concluída</div>
+    <div class="state-sub">O documento foi assinado e enviado com sucesso.</div>
+  </div>
+
+  <div id="state-doc" class="state-container">
+    <header id="doc-header">
+      <div class="doc-name" id="doc-name">Documento</div>
+      <div class="page-nav" id="page-nav" style="display:none;">
+        <button class="page-btn" id="btn-prev">‹</button>
+        <span class="page-label" id="page-label">1 / 1</span>
+        <button class="page-btn" id="btn-next">›</button>
+      </div>
+    </header>
+
+    <main id="canvas-scroll">
+      <div id="canvas-wrap">
+        <canvas id="pdf-canvas"></canvas>
+        <canvas id="sig-canvas"></canvas>
+      </div>
+    </main>
+
+    <footer id="doc-footer">
+      <div class="sig-tools">
+        <div class="color-dot active" style="background:#1a1a18;" data-color="#1a1a18" title="Preto"></div>
+        <div class="color-dot" style="background:#185FA5;" data-color="#185FA5" title="Azul"></div>
+        <div class="color-dot" style="background:#A32D2D;" data-color="#A32D2D" title="Vermelho"></div>
+        <div class="tool-sep"></div>
+        <input type="range" class="size-slider" min="1" max="8" value="2" id="pen-size" title="Espessura">
+        <div class="tool-sep"></div>
+        <button class="ghost-btn" id="btn-undo" title="Desfazer">↩</button>
+        <button class="ghost-btn" id="btn-clear">Limpar página</button>
+      </div>
+
+      <button class="btn-conclude" id="btn-conclude">
+        <div class="btn-spinner" id="btn-spinner"></div>
+        <span id="btn-label">Concluir</span>
+      </button>
+    </footer>
+  </div>
+
+  <div id="toast"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
