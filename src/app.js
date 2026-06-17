@@ -1,4 +1,4 @@
-const API_BASE = 'https://api.exemplo.com';
+const API_BASE = 'https://localhost:7093';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
@@ -67,13 +67,13 @@ async function init() {
   }
 
   try {
-    const res = await fetch(`${API_BASE}/documento/${docGuid}`);
+    const res = await fetch(`${API_BASE}/api/AssinaturaEletronica/${docGuid}`);
     if (res.status === 404) throw new Error('Documento não encontrado (404).');
     if (!res.ok) throw new Error(`Erro ao buscar documento (${res.status}).`);
 
     const data = await res.json();
-    const b64 = data.base64 ?? data.document ?? data.file ?? data.content;
-    if (!b64) throw new Error('Resposta da API não contém o documento em base64.');
+    const b64 = data.documentoBase64;
+    if (!b64) throw new Error('Documento não foi encontrado.');
 
     document.getElementById('doc-name').textContent = data.filename ?? `Documento ${docGuid}`;
 
@@ -92,7 +92,7 @@ async function init() {
 }
 
 async function loadPdfViewer() {
-  pdfDoc = await pdfjsLib.getDocument({ data: originalBytes }).promise;
+  pdfDoc = await pdfjsLib.getDocument({ data: originalBytes.slice() }).promise;
   pageCount = pdfDoc.numPages;
   currentPage = 1;
 
@@ -280,13 +280,16 @@ async function conclude() {
       }
     }
 
-    const modifiedPdfBase64 = await pdfDocLib.saveAsBase64();
+    const savedBytes = await pdfDocLib.save();
+    const modifiedPdfBase64 = btoa(
+      String.fromCharCode.apply(null, savedBytes)
+    );
 
-    const res = await fetch(`${API_BASE}/documento/${docGuid}/assinar`, {
+    const res = await fetch(`${API_BASE}/api/AssinaturaEletronica/confirmar/${docGuid}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ 
-        signedBase64: modifiedPdfBase64
+        ImagemBase64: modifiedPdfBase64
       })
     });
 
