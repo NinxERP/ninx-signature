@@ -26,7 +26,6 @@ Este repositório é um dos cinco que compõem o Ninx:
 | [ninx-front](../ninx-front) | Cliente desktop atual (ERP/POS), em Tauri v2 + React — gera o link/QR code para esta página. |
 | [old-ninx-front](../old-ninx-front) | Cliente desktop antigo, em .NET MAUI — **descontinuado**, mantido só como referência histórica. |
 | **ninx-signature** (este) | Página pública onde o cliente final assina documentos de venda. |
-| [docs](../docs) | Documentação complementar (auditoria da migração de frontend, notas de arquitetura). |
 
 ## ⚙️ Stack
 
