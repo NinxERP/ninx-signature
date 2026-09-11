@@ -41,16 +41,13 @@
       <div id="canvas-wrap">
         <canvas id="pdf-canvas"></canvas>
         <canvas id="sig-canvas"></canvas>
+        <div id="sign-hint" class="sign-hint">✎ Assine aqui</div>
       </div>
     </main>
 
     <footer id="doc-footer">
       <div class="sig-tools">
-        <div class="color-dot active" style="background:#1a1a18;" data-color="#1a1a18" title="Preto"></div>
-        <div class="color-dot" style="background:#185FA5;" data-color="#185FA5" title="Azul"></div>
-        <div class="color-dot" style="background:#A32D2D;" data-color="#A32D2D" title="Vermelho"></div>
-        <div class="tool-sep"></div>
-        <input type="range" class="size-slider" min="1" max="8" value="2" id="pen-size" title="Espessura">
+        <input type="range" class="size-slider" min="1" max="6" value="1" id="pen-size" title="Espessura do pincel">
         <div class="tool-sep"></div>
         <button class="ghost-btn" id="btn-undo" title="Desfazer">↩</button>
         <button class="ghost-btn" id="btn-clear">Limpar página</button>

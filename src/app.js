@@ -9,8 +9,7 @@ let originalBytes = null;
 let docGuid = '';
 let drawing = false;
 let currentStroke = [];
-let penColor = '#1a1a18';
-
+const PEN_COLOR = '#1a1a18';
 
 const pageSignatures = {};
 
@@ -18,6 +17,37 @@ const pdfCanvas = document.getElementById('pdf-canvas');
 const pdfCtx = pdfCanvas.getContext('2d');
 const sigCanvas = document.getElementById('sig-canvas');
 const sigCtx = sigCanvas.getContext('2d');
+const canvasWrap = document.getElementById('canvas-wrap');
+const signHint = document.getElementById('sign-hint');
+
+/* ── ZOOM (PINÇA) ── */
+const MIN_ZOOM = 1, MAX_ZOOM = 3;
+let zoomLevel = 1;
+const activePointers = new Map();
+let pinchStartDist = 0;
+let pinchStartZoom = 1;
+
+/* ── RASCUNHO (LOCALSTORAGE) ── */
+function draftKey() {
+  return `ninx-sig-draft-${docGuid}`;
+}
+function saveDraft() {
+  try { localStorage.setItem(draftKey(), JSON.stringify(pageSignatures)); } catch (e) {}
+}
+function loadDraft() {
+  try {
+    const raw = localStorage.getItem(draftKey());
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) { return null; }
+}
+function clearDraft() {
+  try { localStorage.removeItem(draftKey()); } catch (e) {}
+}
+
+function updateHint() {
+  const totalStrokes = Object.values(pageSignatures).reduce((acc, curr) => acc + curr.length, 0);
+  signHint.classList.toggle('hidden', totalStrokes > 0);
+}
 
 document.addEventListener('DOMContentLoaded', () => {
   init();
@@ -28,14 +58,6 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-clear').addEventListener('click', clearSig);
   document.getElementById('btn-undo').addEventListener('click', undoLast);
   document.getElementById('btn-conclude').addEventListener('click', conclude);
-  
-  document.querySelectorAll('.color-dot').forEach(dot => {
-    dot.addEventListener('click', (e) => {
-      penColor = e.target.getAttribute('data-color');
-      document.querySelectorAll('.color-dot').forEach(d => d.classList.remove('active'));
-      e.target.classList.add('active');
-    });
-  });
 });
 
 function showState(id) {
@@ -84,6 +106,15 @@ async function init() {
     }
 
     await loadPdfViewer();
+
+    const draft = loadDraft();
+    if (draft) {
+      Object.assign(pageSignatures, draft);
+      redraw();
+      toast('Rascunho restaurado.');
+    }
+    updateHint();
+
     showState('state-doc');
   } catch (e) {
     document.getElementById('error-msg').textContent = e.message;
@@ -105,11 +136,13 @@ async function loadPdfViewer() {
 
 async function renderPage(num) {
   const page = await pdfDoc.getPage(num);
-  
-  const viewport = page.getViewport({ scale: 1.5 });
+
+  const dpr = window.devicePixelRatio || 1;
+  const viewport = page.getViewport({ scale: 1.5 * dpr });
 
   pdfCanvas.width = viewport.width;
   pdfCanvas.height = viewport.height;
+  pdfCanvas.style.width = `${viewport.width / dpr}px`;
   sigCanvas.width = viewport.width;
   sigCanvas.height = viewport.height;
 
@@ -134,30 +167,72 @@ async function changePage(dir) {
 }
 
 /* ── CAPTURA DE TRAÇOS (SIGNATURE CANVAS) ── */
+const MIN_POINT_DIST = 2; // px no buffer do canvas — descarta pontos redundantes, PDF final fica bem menor
+
+function pointerDist(p1, p2) {
+  return Math.hypot(p1.x - p2.x, p1.y - p2.y);
+}
+
+function applyZoom() {
+  canvasWrap.style.transform = zoomLevel === 1 ? '' : `scale(${zoomLevel})`;
+}
+
 function setupSignatureEvents() {
   sigCanvas.addEventListener('pointerdown', e => {
+    activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (activePointers.size === 2) {
+      drawing = false;
+      currentStroke = [];
+      redraw();
+      const [p1, p2] = [...activePointers.values()];
+      pinchStartDist = pointerDist(p1, p2);
+      pinchStartZoom = zoomLevel;
+      return;
+    }
+    if (activePointers.size > 2) return;
+
     e.preventDefault();
     drawing = true;
     currentStroke = [getCoordinates(e)];
   });
 
   sigCanvas.addEventListener('pointermove', e => {
+    if (!activePointers.has(e.pointerId)) return;
+    activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (activePointers.size === 2) {
+      e.preventDefault();
+      const [p1, p2] = [...activePointers.values()];
+      const newDist = pointerDist(p1, p2);
+      zoomLevel = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, pinchStartZoom * (newDist / pinchStartDist)));
+      if (Math.abs(zoomLevel - 1) < 0.03) zoomLevel = 1;
+      applyZoom();
+      return;
+    }
+
     if (!drawing) return;
     e.preventDefault();
-    currentStroke.push(getCoordinates(e));
-    redraw();
+    const point = getCoordinates(e);
+    const last = currentStroke[currentStroke.length - 1];
+    if (!last || Math.hypot(point.x - last.x, point.y - last.y) >= MIN_POINT_DIST) {
+      currentStroke.push(point);
+      redraw();
+    }
   });
 
-  const stopDrawing = () => {
+  const stopDrawing = e => {
+    activePointers.delete(e.pointerId);
     if (!drawing) return;
     drawing = false;
     if (currentStroke.length > 1) {
       const sizeValue = +document.getElementById('pen-size').value;
       pageSignatures[currentPage].push({
         pts: [...currentStroke],
-        color: penColor,
         size: sizeValue
       });
+      saveDraft();
+      updateHint();
     }
     currentStroke = [];
     redraw();
@@ -165,6 +240,7 @@ function setupSignatureEvents() {
 
   sigCanvas.addEventListener('pointerup', stopDrawing);
   sigCanvas.addEventListener('pointerleave', stopDrawing);
+  sigCanvas.addEventListener('pointercancel', stopDrawing);
 }
 
 function getCoordinates(e) {
@@ -186,7 +262,6 @@ function redraw() {
   if (currentStroke.length > 0) {
     activeStrokes.push({
       pts: currentStroke,
-      color: penColor,
       size: +document.getElementById('pen-size').value
     });
   }
@@ -194,7 +269,7 @@ function redraw() {
   for (const stroke of activeStrokes) {
     if (stroke.pts.length < 2) continue;
     sigCtx.beginPath();
-    sigCtx.strokeStyle = stroke.color;
+    sigCtx.strokeStyle = PEN_COLOR;
     sigCtx.lineWidth = stroke.size;
     sigCtx.lineCap = 'round';
     sigCtx.lineJoin = 'round';
@@ -211,23 +286,18 @@ function undoLast() {
   if (pageSignatures[currentPage] && pageSignatures[currentPage].length > 0) {
     pageSignatures[currentPage].pop();
     redraw();
+    saveDraft();
+    updateHint();
   }
 }
 
 function clearSig() {
   pageSignatures[currentPage] = [];
   redraw();
+  saveDraft();
+  updateHint();
 }
 
-
-function hexToRgb(hex) {
-  const match = hex.replace(/^#/, '').match(/.{2}/g);
-  return {
-    r: parseInt(match[0], 16) / 255,
-    g: parseInt(match[1], 16) / 255,
-    b: parseInt(match[2], 16) / 255
-  };
-}
 
 async function conclude() {
   const totalStrokes = Object.values(pageSignatures).reduce((acc, curr) => acc + curr.length, 0);
@@ -261,22 +331,20 @@ async function conclude() {
       const scaleY = height / sigCanvas.height;
 
       for (const stroke of strokesInPage) {
-        const rgb = hexToRgb(stroke.color);
-        
-        for (let i = 0; i < stroke.pts.length - 1; i++) {
-          const p1 = stroke.pts[i];
-          const p2 = stroke.pts[i + 1];
+        if (stroke.pts.length < 2) continue;
 
+        const svgPath = stroke.pts
+          .map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x * scaleX} ${p.y * scaleY}`)
+          .join(' ');
 
-          targetPage.drawLine({
-            start: { x: p1.x * scaleX, y: height - (p1.y * scaleY) },
-            end: { x: p2.x * scaleX, y: height - (p2.y * scaleY) },
-            thickness: stroke.size * scaleX, 
-            color: PDFLib.rgb(rgb.r, rgb.g, rgb.b),
-            opacity: 1,
-            lineCap: PDFLib.LineCapStyle.Round
-          });
-        }
+        targetPage.drawSvgPath(svgPath, {
+          x: 0,
+          y: height,
+          borderColor: PDFLib.rgb(0.102, 0.102, 0.094),
+          borderWidth: stroke.size * scaleX,
+          borderOpacity: 1,
+          borderLineCap: PDFLib.LineCapStyle.Round
+        });
       }
     }
 
@@ -295,6 +363,7 @@ async function conclude() {
 
     if (!res.ok) throw new Error(`Falha ao enviar (${res.status}).`);
 
+    clearDraft();
     showState('state-done');
   } catch (e) {
     toast(e.message);
