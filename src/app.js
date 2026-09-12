@@ -1,4 +1,4 @@
-const API_BASE = 'https://ninx-api-vd8x.onrender.com';
+const API_BASE = 'https://ninx-api.maataug.com.br';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
