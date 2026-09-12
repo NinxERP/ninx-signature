@@ -188,6 +188,11 @@ function setupSignatureEvents() {
       const [p1, p2] = [...activePointers.values()];
       pinchStartDist = pointerDist(p1, p2);
       pinchStartZoom = zoomLevel;
+
+      const rect = canvasWrap.getBoundingClientRect();
+      const originX = ((p1.x + p2.x) / 2 - rect.left) / rect.width * 100;
+      const originY = ((p1.y + p2.y) / 2 - rect.top) / rect.height * 100;
+      canvasWrap.style.transformOrigin = `${originX}% ${originY}%`;
       return;
     }
     if (activePointers.size > 2) return;
