@@ -1,6 +1,33 @@
 const API_BASE = 'https://ninx-api.maataug.com.br';
 
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+const PDF_WORKER_URL = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+const PDF_WORKER_SRI = 'sha512-BbrZ76UNZq5BhH7LL7pn9A4TKQpQeNCHOo65/akfelcIBbcVvYWOFQKPXIrykE3qZxYjmDX573oa4Ywsc7rpTw==';
+
+// O worker do pdf.js é quem interpreta o PDF exibido ao signatário. Ele não aceita
+// o atributo integrity como uma tag <script>, então é baixado com SRI e instanciado
+// a partir do conteúdo já verificado: se o arquivo no CDN mudar, o download falha e
+// a página não chega a exibir um documento possivelmente adulterado.
+async function prepararWorkerPdf() {
+  let res;
+  try {
+    res = await fetch(PDF_WORKER_URL, { integrity: PDF_WORKER_SRI, mode: 'cors', credentials: 'omit' });
+  } catch (e) {
+    throw new Error('Não foi possível carregar o visualizador de documentos com segurança.');
+  }
+  if (!res.ok) throw new Error('Não foi possível carregar o visualizador de documentos.');
+  const blobUrl = URL.createObjectURL(new Blob([await res.text()], { type: 'text/javascript' }));
+  pdfjsLib.GlobalWorkerOptions.workerPort = new Worker(blobUrl);
+}
+
+// A API responde erros de negócio como { messagem } (ex.: link expirado). Mostra essa
+// mensagem ao signatário em vez do código HTTP.
+async function mensagemDeErro(res, padrao) {
+  try {
+    const corpo = await res.json();
+    if (corpo && typeof corpo.messagem === 'string' && corpo.messagem) return corpo.messagem;
+  } catch (e) {}
+  return padrao;
+}
 
 let pdfDoc = null;
 let currentPage = 1;
@@ -91,7 +118,7 @@ async function init() {
   try {
     const res = await fetch(`${API_BASE}/api/AssinaturaEletronica/${docGuid}`);
     if (res.status === 404) throw new Error('Documento não encontrado (404).');
-    if (!res.ok) throw new Error(`Erro ao buscar documento (${res.status}).`);
+    if (!res.ok) throw new Error(await mensagemDeErro(res, `Erro ao buscar documento (${res.status}).`));
 
     const data = await res.json();
     const b64 = data.documentoBase64;
@@ -105,6 +132,7 @@ async function init() {
       originalBytes[i] = binary.charCodeAt(i);
     }
 
+    await prepararWorkerPdf();
     await loadPdfViewer();
 
     const draft = loadDraft();
@@ -366,7 +394,7 @@ async function conclude() {
       })
     });
 
-    if (!res.ok) throw new Error(`Falha ao enviar (${res.status}).`);
+    if (!res.ok) throw new Error(await mensagemDeErro(res, `Falha ao enviar (${res.status}).`));
 
     clearDraft();
     showState('state-done');
