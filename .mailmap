@@ -1,6 +1,0 @@
-# Normaliza as identidades de autoria para estatisticas (git shortlog -sne, git log).
-# Nao reescreve o historico: apenas unifica a exibicao.
-Matheus Augusto Teixeira Silva <maataug.pessoal@gmail.com> Matheus Augusto <maataug.pessoal@gmail.com>
-Matheus Augusto Teixeira Silva <maataug.pessoal@gmail.com> Matheus Silva <matheus.silva@bit.com.br>
-Matheus Augusto Teixeira Silva <maataug.pessoal@gmail.com> Matheus Augusto <129510488+maat-aug@users.noreply.github.com>
-Matheus Augusto Teixeira Silva <maataug.pessoal@gmail.com> maat-aug <1.29510488e+08+maat-aug@users.noreply.github.com>
