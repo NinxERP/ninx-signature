@@ -2,13 +2,16 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Assinar Documento</title>
   <link rel="icon" type="image/svg+xml" href="/favicon.svg">
   <link rel="stylesheet" href="/style.css">
+
+  <!-- pdf.js: exibe o documento -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"
           integrity="sha512-q+4liFwdPC/bNdhUpZx6aXDx/h77yEQtn4I1slHydcbZK34nLaR3cAeYSJshoxIOq3mjEf7xJE8YWIUHMn+oCQ=="
           crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+  <!-- pdf-lib: grava a assinatura no PDF -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"
           integrity="sha512-z8IYLHO8bTgFqj+yrPyIJnzBDf7DDhWwiEsk4sY+Oe6J2M+WQequeGS7qioI5vT6rXgVRb4K1UVQC5ER7MKzKQ=="
           crossorigin="anonymous" referrerpolicy="no-referrer"></script>
@@ -23,7 +26,7 @@
   <div id="state-error" class="state-container">
     <div class="state-icon icon-error">✕</div>
     <div class="state-title">Documento não encontrado</div>
-    <div class="state-sub" id="error-msg">Não foi possível carregar o documento. Verifique o link e tente novamente.</div>
+    <div id="error-msg" class="state-sub">Não foi possível carregar o documento. Verifique o link e tente novamente.</div>
   </div>
 
   <div id="state-done" class="state-container">
@@ -34,39 +37,56 @@
 
   <div id="state-doc" class="state-container">
     <header id="doc-header">
-      <div class="doc-name" id="doc-name">Documento</div>
-      <div class="page-nav" id="page-nav" style="display:none;">
-        <button class="page-btn" id="btn-prev">‹</button>
-        <span class="page-label" id="page-label">1 / 1</span>
-        <button class="page-btn" id="btn-next">›</button>
-      </div>
+      <div id="doc-name" class="doc-name">Documento</div>
+      <nav id="page-nav" class="page-nav" hidden>
+        <button id="btn-prev" class="page-btn" aria-label="Página anterior">‹</button>
+        <span id="page-label" class="page-label">1 / 1</span>
+        <button id="btn-next" class="page-btn" aria-label="Próxima página">›</button>
+      </nav>
     </header>
 
-    <main id="canvas-scroll">
+    <main id="canvas-scroll" class="mode-hand">
       <div id="canvas-wrap">
         <canvas id="pdf-canvas"></canvas>
         <canvas id="sig-canvas"></canvas>
-        <div id="sign-hint" class="sign-hint">✎ Assine aqui</div>
+        <div id="sign-hint" class="sign-hint">Toque em ✎ para assinar</div>
       </div>
     </main>
 
     <footer id="doc-footer">
       <div class="sig-tools">
-        <input type="range" class="size-slider" min="1" max="6" value="1" id="pen-size" title="Espessura do pincel">
+        <button id="btn-pen" class="ghost-btn tool-btn" title="Caneta: alterna entre assinar e mover/zoom" aria-label="Caneta" aria-pressed="false">✎</button>
+        <button id="btn-zoom-out" class="ghost-btn tool-btn" title="Diminuir zoom" aria-label="Diminuir zoom">−</button>
+        <button id="btn-zoom-in" class="ghost-btn tool-btn" title="Aumentar zoom" aria-label="Aumentar zoom">+</button>
         <div class="tool-sep"></div>
-        <button class="ghost-btn" id="btn-undo" title="Desfazer">↩</button>
-        <button class="ghost-btn" id="btn-clear">Limpar página</button>
+
+        <input id="pen-size" class="size-slider" type="range" min="0.5" max="4" step="0.5" value="1.5" title="Espessura do traço" aria-label="Espessura do traço">
+        <div class="tool-sep"></div>
+
+        <button id="btn-undo" class="ghost-btn tool-btn" title="Desfazer" aria-label="Desfazer">↩</button>
+        <button id="btn-clear" class="ghost-btn tool-btn" title="Limpar página" aria-label="Limpar página">🗑</button>
       </div>
 
-      <button class="btn-conclude" id="btn-conclude">
-        <div class="btn-spinner" id="btn-spinner"></div>
+      <button id="btn-conclude" class="btn-conclude" disabled>
+        <span id="btn-spinner" class="btn-spinner"></span>
         <span id="btn-label">Concluir</span>
       </button>
     </footer>
   </div>
 
-  <div id="toast"></div>
+  <dialog id="confirm-dialog" aria-labelledby="confirm-title">
+    <form method="dialog">
+      <div id="confirm-title" class="state-title">Confirmar envio?</div>
+      <p class="state-sub">Depois de enviada, a assinatura não poderá ser alterada.</p>
+      <div class="dialog-actions">
+        <button class="ghost-btn" value="cancel">Revisar</button>
+        <button class="btn-conclude" value="ok">Enviar</button>
+      </div>
+    </form>
+  </dialog>
 
-<script src="/app.js"></script>
+  <div id="toast" role="status" aria-live="polite"></div>
+
+  <script src="/app.js"></script>
 </body>
 </html>
