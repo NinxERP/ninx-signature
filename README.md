@@ -23,7 +23,7 @@ The page requires no customer account or application installation. It is a stati
 - **Handwritten signatures:** draw over the document with pointer input, undo strokes, or clear the current page.
 - **Touch interaction:** pinch to zoom while reviewing the document.
 - **Draft recovery:** preserve page strokes in local storage, keyed by document GUID, and clear the draft after successful submission.
-- **PDF submission:** embed the drawn strokes into the original PDF and send the result to the API.
+- **Signature submission:** send only the drawn strokes (page, width and points normalized to the page); the API draws them over the original PDF it generated.
 - **Feedback:** dedicated loading, document, error, and completion states, with API business-error messages surfaced to the signer.
 
 ## Tech Stack
@@ -33,11 +33,10 @@ The page requires no customer account or application installation. It is a stati
 | HTML / CSS / vanilla JavaScript | A focused signing interface without a frontend framework or build pipeline. |
 | Canvas / Pointer Events | Document display, signature input, and touch interaction. |
 | PDF.js 3.11.174 | PDF rendering in the browser, using a worker. |
-| pdf-lib 1.17.1 | Embedding signature strokes into the PDF before submission. |
 | Fetch / local storage | API communication and local draft persistence. |
 | Azure Static Web Apps / GitHub Actions | Static hosting, route fallback, response headers, and deployment. |
 
-PDF.js and pdf-lib are loaded from CDN URLs pinned in [`index.html`](src/index.html), with Subresource Integrity attributes. The PDF.js worker is fetched with an integrity check before being instantiated.
+PDF.js is loaded from a CDN URL pinned in [`index.html`](src/index.html), with Subresource Integrity attributes. The PDF.js worker is fetched with an integrity check before being instantiated.
 
 ## Architecture
 
@@ -77,7 +76,7 @@ src/
 
 The page uses a document GUID as its access link, without a JWT login. The backend controls document availability and confirmation, including rejecting repeated signing or inactive documents. The signed PDF and evidence are stored by the API.
 
-The captured mark is a drawn electronic signature embedded in a PDF. The browser does not apply a certificate-based digital signature.
+The captured mark is a drawn electronic signature that the API embeds in the PDF. The browser does not apply a certificate-based digital signature.
 
 </details>
 
@@ -130,9 +129,9 @@ Use local test documents: confirmation changes the associated operation in the A
 | Request | Contract used by the page |
 | --- | --- |
 | `GET /api/AssinaturaEletronica/{guid}` | Reads `documentoBase64` from the response to load the PDF. |
-| `POST /api/AssinaturaEletronica/confirmar/{guid}` | Sends `{ "ImagemBase64": "<signed PDF as Base64>" }`. |
+| `POST /api/AssinaturaEletronica/confirmar/{guid}` | Sends `{ "tracos": [{ "pagina", "espessura", "pontos": [{ "x", "y" }] }] }`, with points normalized to 0..1 from the top-left corner of the page and width in PDF points. |
 
-The confirmation field retains its API name, `ImagemBase64`, but contains the modified PDF rather than a standalone signature image. Error handling reads the API's `messagem` field.
+The API draws the strokes over the original PDF it generated, so the browser never sends document content. Error handling reads the API's `messagem` field.
 
 See the backend's local [Swagger UI](https://localhost:7093/swagger) for endpoint documentation.
 

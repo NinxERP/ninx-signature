@@ -13,8 +13,7 @@ const ZOOM_SNAP = 0.03;
 const WHEEL_ZOOM_SPEED = 0.002;
 const MIN_POINT_DIST = 2;        // px; descarta pontos redundantes
 
-const PEN_COLOR = '#1a1a18';
-const PEN_COLOR_RGB = [0.102, 0.102, 0.094];
+const PEN_COLOR = '#1a1a18';    // a API usa a mesma cor ao desenhar no PDF
 
 const HINT_PEN = '✎ Assine aqui';
 const HINT_HAND = 'Toque em ✎ para assinar';
@@ -120,11 +119,11 @@ async function fetchDocument(guid) {
   return { filename: data.filename, bytes: base64ToBytes(data.documentoBase64) };
 }
 
-async function postSignedDocument(guid, pdfBase64) {
+async function postSignature(guid, tracos) {
   const res = await fetch(`${API_BASE}/api/AssinaturaEletronica/confirmar/${guid}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ImagemBase64: pdfBase64 })
+    body: JSON.stringify({ tracos })
   });
   if (!res.ok) throw new Error(await apiErrorMessage(res, `Falha ao enviar (${res.status}).`));
 }
@@ -459,8 +458,7 @@ function conclude() {
 async function send() {
   setSending(true);
   try {
-    const signedPdf = await buildSignedPdf();
-    await postSignedDocument(docGuid, bytesToBase64(signedPdf));
+    await postSignature(docGuid, collectStrokes());
     clearDraft();
     showState('state-done');
   } catch (e) {
@@ -469,33 +467,20 @@ async function send() {
   }
 }
 
-async function buildSignedPdf() {
-  const pdf = await PDFLib.PDFDocument.load(originalBytes);
-  const pages = pdf.getPages();
-
-  for (const [pageNum, strokes] of Object.entries(pageSignatures)) {
-    const page = pages[Number(pageNum) - 1];
-    const { width, height } = page.getSize();
-
-    for (const { pts, size } of strokes) {
-      if (pts.length < 2) continue;
-
-      const svgPath = pts
-        .map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.x * width} ${p.y * height}`)
-        .join(' ');
-
-      page.drawSvgPath(svgPath, {
-        x: 0,
-        y: height,
-        borderColor: PDFLib.rgb(...PEN_COLOR_RGB),
-        borderWidth: size,
-        borderOpacity: 1,
-        borderLineCap: PDFLib.LineCapStyle.Round
-      });
-    }
-  }
-
-  return pdf.save();
+// Só os traços vão para a API, que os desenha sobre o PDF original guardado por ela:
+// o navegador não tem como alterar o documento assinado.
+// Com o ponteiro capturado o dedo pode sair da página, e a API só aceita pontos em 0..1.
+function collectStrokes() {
+  const clamp = v => Math.min(1, Math.max(0, v));
+  return Object.entries(pageSignatures).flatMap(([pageNum, strokes]) =>
+    strokes
+      .filter(({ pts }) => pts.length >= 2)
+      .map(({ pts, size }) => ({
+        pagina: Number(pageNum),
+        espessura: size,
+        pontos: pts.map(({ x, y }) => ({ x: clamp(x), y: clamp(y) }))
+      }))
+  );
 }
 
 /* ── UTILITÁRIOS ── */
@@ -504,15 +489,6 @@ function base64ToBytes(b64) {
   return Uint8Array.from(atob(b64), c => c.charCodeAt(0));
 }
 
-// Em blocos: fromCharCode com o arquivo inteiro estoura a pilha.
-function bytesToBase64(bytes) {
-  const CHUNK = 0x8000;
-  let binary = '';
-  for (let i = 0; i < bytes.length; i += CHUNK) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
-  }
-  return btoa(binary);
-}
 
 /* ── UI: ESTADOS DA TELA E AVISOS ── */
 
